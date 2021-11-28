@@ -1,0 +1,65 @@
+// Jenkinsfile for the application in https://github.com/jero005/homework_challenge-1.git
+
+Jenkinsfile
+pipeline {
+  agent {
+    kubernetes {
+      label truffleslave
+      yaml """
+apiVersion: v1
+kind: Pod
+serviceAccount: 
+metadata:
+  labels:
+    worker: truffleslave
+spec:
+  containers:
+  - name: jnlp
+    image: jenkins/inbound-agent:4.7-1
+  - name: truffle
+    image: dxa4481/tufflehog:latest
+    command:
+    - cat
+    tty: true
+"""
+      }
+    }
+
+    stages {
+        stage('PreBuildTest') {
+            container("truffle"){
+                when {
+                    branch 'master'
+                }
+                steps {
+                    container("builder"){
+                        script {
+                            truffleHog file://${env.WORKSPACE}/ | tee results.json
+                        }
+                    }
+                }
+            }
+        }
+        stage('Build') {
+            steps {
+                echo 'Building..'
+            }
+        }
+        stage('PostBuildTest') {
+            steps {
+                echo 'Testing..'
+            }
+        }
+        stage('Push') {
+            steps {
+                echo 'Pushing deployable artefacts....'
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'results.json'
+        }
+    }
+}
